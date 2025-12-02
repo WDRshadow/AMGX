@@ -1196,12 +1196,11 @@ void reorderElementsDeviceCSR(INDEX_TYPE num_rows,
                               T *values,
                               INDEX_TYPE block_size)
 {
-    amgx::thrust::device_ptr<INDEX_TYPE> dev_ptr = amgx::thrust::device_pointer_cast(row_offsets);
-    INDEX_TYPE max_row_length = std::max(1, thrust_wrapper::transform_reduce<AMGX_device>(dev_ptr, dev_ptr + num_rows, row_length<INDEX_TYPE>(), 0, amgx::thrust::maximum<INDEX_TYPE>()));
+    INDEX_TYPE max_row_length = std::max(1, thrust_wrapper::transform_reduce<AMGX_device>(row_offsets, row_offsets + num_rows, row_length<INDEX_TYPE>(), 0, amgx::thrust::maximum<INDEX_TYPE>()));
     //TODO: optimise this in terms of storage
     INDEX_TYPE storage_space = 100 * 1024 * 1024 * sizeof(T) / sizeof(cuDoubleComplex); // because we allocate as for cuComplex
     INDEX_TYPE blocks = 1500 < storage_space / (max_row_length * block_size * sizeof(T)) ? 1500 : storage_space / (max_row_length * block_size * sizeof(T));
-    blocks = blocks < num_rows ? blocks : num_rows;
+    blocks = blocks < num_rows ? max(1, blocks) : num_rows;
     INDEX_TYPE aligned_space = ((max_row_length * block_size * sizeof(T) / 128 + 1) * 128) / sizeof(T); //pad to 128 bytes
     Vector<amgx::TemplateConfig<AMGX_device, AMGX_vecDoubleComplex, AMGX_matDoubleComplex, AMGX_indInt> > tempstorage(blocks * aligned_space);
     reorderElements <<< blocks, 256>>>(num_rows, row_offsets, permutation, values, (T *)tempstorage.raw(), aligned_space, block_size);
